@@ -30,51 +30,51 @@ from datetime import datetime
 
 from astropy.io import fits
 from astropy.time import Time
-from astropy.visualization import ZScaleInterval
+# from astropy.visualization import ZScaleInterval
 
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw
-from matplotlib import cm
+# from PIL import Image
+# from PIL import ImageFont
+# from PIL import ImageDraw
+# from matplotlib import cm
 
 from atv.streamprotocol import StreamProtocol
-from atv.rms import sigmaclip
-from atv.constellations import Constellations
+# from atv.rms import sigmaclip
+# from atv.constellations import Constellations
 
 
 # In[ ]:
 
 
 FILE_SIZE = 4204800
-IMAGE_RES = 1024
+# IMAGE_RES = 1024
 FPS = 25
-SOURCES = ['Cas.A', 'Cyg.A', 'Tau.A', 'Vir.A', 'Sun', 'Moon']
-CONSTELLATIONS = ['Ursa Minor']
-CMD = ["ffmpeg",
-       # for ffmpeg always first set input then output
+# SOURCES = ['Cas.A', 'Cyg.A', 'Tau.A', 'Vir.A', 'Sun', 'Moon']
+# CONSTELLATIONS = ['Ursa Minor']
+# CMD = ["ffmpeg",
+#        # for ffmpeg always first set input then output
 
-       # silent audio
-       '-f', 'lavfi',
-       '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+#        # silent audio
+#        '-f', 'lavfi',
+#        '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
 
-       # image
-       '-re',
-       '-f', 'rawvideo',           # probably required for reading from stdin
-       '-s', '1024x1024',          # should match image size
-       '-pix_fmt', 'rgba',
-       '-i', '-',                  # read from stdin
+#        # image
+#        '-re',
+#        '-f', 'rawvideo',           # probably required for reading from stdin
+#        '-s', '1024x1024',          # should match image size
+#        '-pix_fmt', 'rgba',
+#        '-i', '-',                  # read from stdin
 
-       # encoding settings
-       "-r", str(FPS),             # the framerate
-       "-vcodec", "libx264",       # probably required for flv & rtmp
-       "-preset", "ultrafast",     # the encoding quality preset
-       "-g", "20",
-       "-codec:a", "libmp3lame",   # mp3 for audio
-       "-ar", "44100",             # 44k audio rate
-       "-threads", "6",
-       "-bufsize", "512k",
-       "-f", "flv",                # required for rtmp
-       ]
+#        # encoding settings
+#        "-r", str(FPS),             # the framerate
+#        "-vcodec", "libx264",       # probably required for flv & rtmp
+#        "-preset", "ultrafast",     # the encoding quality preset
+#        "-g", "20",
+#        "-codec:a", "libmp3lame",   # mp3 for audio
+#        "-ar", "44100",             # 44k audio rate
+#        "-threads", "6",
+#        "-bufsize", "512k",
+#        "-f", "flv",                # required for rtmp
+#        ]
 
 
 # In[ ]:
@@ -300,8 +300,8 @@ class Stream(Protocol):
         if self.bytes_received+n >= FILE_SIZE:
             # process on another thread
             fitsimg = fits.PrimaryHDU().fromstring(self.bb1)
-            #self.process(fitsimg) # (for debugging)
-            threads.deferToThread(self.process, fitsimg)
+            self.process(fitsimg) # (for debugging)
+            #threads.deferToThread(self.process, fitsimg) 
             # swap buffers
             self.bb1, self.bb2 = self.bb2, self.bb1
             # copy remaining data in current buffer
