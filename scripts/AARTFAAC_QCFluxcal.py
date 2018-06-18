@@ -26,6 +26,8 @@ import sys
 import numpy as np
 import pandas as pd
 
+import threading 
+
 from datetime import datetime
 
 from astropy.io import fits
@@ -48,6 +50,8 @@ from atv.streamprotocol import StreamProtocol
 FILE_SIZE = 4204800
 # IMAGE_RES = 1024
 FPS = 25
+
+lock = threading.Lock()
 # SOURCES = ['Cas.A', 'Cyg.A', 'Tau.A', 'Vir.A', 'Sun', 'Moon']
 # CONSTELLATIONS = ['Ursa Minor']
 # CMD = ["ffmpeg",
@@ -166,9 +170,10 @@ def compare_flux(sr, catalog_ras, catalog_decs, catalog_fluxs, catalog_flux_errs
             continue
 
 
-    if len(x) > 1:
+    if len(x) > 2:
         w = np.array(w,dtype=float)
-        fit = np.polyfit(x,y,1,w=1./w)
+        with lock:
+            fit = np.polyfit(x,y,1,w=1./w)
     else:
         fit = [1e9,1e9]
 
@@ -238,10 +243,11 @@ class Stream(Protocol):
             img_HDU = fits.HDUList(fitsimg)
             imagedata = sourcefinder_image_from_accessor(open_accessor(img_HDU, plane=0),**configuration)
             
-            sr = imagedata.extract(
-                det=self.detection, anl=self.analysis,
-                labelled_data=None, labels=[],
-                force_beam=True)
+            with lock:
+                sr = imagedata.extract(
+                    det=self.detection, anl=self.analysis,
+                    labelled_data=None, labels=[],
+                    force_beam=True)
             
             # Reference catalogue compare
             slope_cor, intercept_cor = compare_flux(sr,
@@ -300,8 +306,8 @@ class Stream(Protocol):
         if self.bytes_received+n >= FILE_SIZE:
             # process on another thread
             fitsimg = fits.PrimaryHDU().fromstring(self.bb1)
-            self.process(fitsimg) # (for debugging)
-            #threads.deferToThread(self.process, fitsimg) 
+            #self.process(fitsimg) # (for debugging)
+            threads.deferToThread(self.process, fitsimg) 
             # swap buffers
             self.bb1, self.bb2 = self.bb2, self.bb1
             # copy remaining data in current buffer
