@@ -4,81 +4,43 @@
 # In[ ]:
 
 
-from twisted.internet.protocol import Protocol, ReconnectingClientFactory
-from twisted.internet import task
-from twisted.internet import defer
-from twisted.internet import reactor
-from twisted.internet import threads
-from twisted.python import log
-
-from sourcefinder.accessors import open as open_accessor
-from sourcefinder.accessors import sourcefinder_image_from_accessor
-from sourcefinder.accessors import writefits as tkp_writefits
-from sourcefinder.utility.cli import parse_monitoringlist_positions
-from sourcefinder.utils import generate_result_maps
-
-from astropy.io.fits.hdu.hdulist import HDUList
-
 import argparse
 import Queue
+# import threading 
 import os
 import sys
 import numpy as np
 import pandas as pd
 
-import threading 
+from twisted.internet.protocol import Protocol, ReconnectingClientFactory
+from twisted.internet import task
+from twisted.internet import defer
+from twisted.internet import reactor
+from twisted.internet import threads
+from twisted.internet import protocol
+from twisted.python import log
 
-from datetime import datetime
+from sourcefinder.accessors import open as open_accessor
+from sourcefinder.accessors import sourcefinder_image_from_accessor
+# from sourcefinder.accessors import writefits as tkp_writefits
+# from sourcefinder.utility.cli import parse_monitoringlist_positions
+# from sourcefinder.utils import generate_result_maps
 
 from astropy.io import fits
+from astropy.io.fits.hdu.hdulist import HDUList
 from astropy.time import Time
-# from astropy.visualization import ZScaleInterval
 
-# from PIL import Image
-# from PIL import ImageFont
-# from PIL import ImageDraw
-# from matplotlib import cm
-
+from datetime import datetime
 from atv.streamprotocol import StreamProtocol
-# from atv.rms import sigmaclip
-# from atv.constellations import Constellations
 
 
 # In[ ]:
 
 
 FILE_SIZE = 4204800
-# IMAGE_RES = 1024
 FPS = 25
 
-lock = threading.Lock()
-# SOURCES = ['Cas.A', 'Cyg.A', 'Tau.A', 'Vir.A', 'Sun', 'Moon']
-# CONSTELLATIONS = ['Ursa Minor']
-# CMD = ["ffmpeg",
-#        # for ffmpeg always first set input then output
-
-#        # silent audio
-#        '-f', 'lavfi',
-#        '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-
-#        # image
-#        '-re',
-#        '-f', 'rawvideo',           # probably required for reading from stdin
-#        '-s', '1024x1024',          # should match image size
-#        '-pix_fmt', 'rgba',
-#        '-i', '-',                  # read from stdin
-
-#        # encoding settings
-#        "-r", str(FPS),             # the framerate
-#        "-vcodec", "libx264",       # probably required for flv & rtmp
-#        "-preset", "ultrafast",     # the encoding quality preset
-#        "-g", "20",
-#        "-codec:a", "libmp3lame",   # mp3 for audio
-#        "-ar", "44100",             # 44k audio rate
-#        "-threads", "6",
-#        "-bufsize", "512k",
-#        "-f", "flv",                # required for rtmp
-#        ]
+# lock = threading.Lock()
 
 
 # In[ ]:
@@ -172,12 +134,60 @@ def compare_flux(sr, catalog_ras, catalog_decs, catalog_fluxs, catalog_flux_errs
 
     if len(x) > 2:
         w = np.array(w,dtype=float)
-        with lock:
-            fit = np.polyfit(x,y,1,w=1./w)
+#         with lock:
+        fit = np.polyfit(x,y,1,w=1./w)
     else:
         fit = [1e9,1e9]
 
     return fit[0], fit[1]
+
+
+# In[ ]:
+
+
+class WriteRead(protocol.ProcessProtocol):
+
+    def __init__(self, data):
+        self.data = data
+
+    def connectionMade(self):
+        self.transport.writeToChild(0, self.data)
+        self.transport.closeChildFD(0)
+
+    def childDataReceived(self, data):
+        self.received = data
+        print "got data:", data
+
+    def processEnded(self, status):
+        print "process ended - now what?"
+
+class Reader(protocol.ProcessProtocol):
+    def __init__(self):
+        pass
+    def connectionMade(self):
+        print "Reader -- connection made"
+        pass
+    def childDataReceived(self, fd, data):
+        print "Reader -- childDataReceived"
+        self.received = data
+    def processEnded(self, status):
+        print "process ended, got:", self.received
+        
+        
+class PassAll(protocol.ProcessProtocol):
+
+    def __init__(self):
+        pass
+    def connectionMade(self):
+        pass
+    def childDataReceived(self, fd):
+        pass
+    
+    def childConectionLost(self, fd):
+        pass
+    
+    def processEnded(self, status):
+        print "process ended, got:", self.received
 
 
 # In[ ]:
@@ -243,11 +253,11 @@ class Stream(Protocol):
             img_HDU = fits.HDUList(fitsimg)
             imagedata = sourcefinder_image_from_accessor(open_accessor(img_HDU, plane=0),**configuration)
             
-            with lock:
-                sr = imagedata.extract(
-                    det=self.detection, anl=self.analysis,
-                    labelled_data=None, labels=[],
-                    force_beam=True)
+#             with lock:
+            sr = imagedata.extract(
+                det=self.detection, anl=self.analysis,
+                labelled_data=None, labels=[],
+                force_beam=True)
             
             # Reference catalogue compare
             slope_cor, intercept_cor = compare_flux(sr,
@@ -272,7 +282,7 @@ class Stream(Protocol):
         Save fits file
         """
         
-        if self.pqueue.qsize() < 1:
+        if self.pqueue.qsize() < 3:
         # why queue more than 3? 
 #             log.msg("Queue size %i" % self.pqueue.qsize())
             return
@@ -307,7 +317,9 @@ class Stream(Protocol):
             # process on another thread
             fitsimg = fits.PrimaryHDU().fromstring(self.bb1)
             #self.process(fitsimg) # (for debugging)
-            threads.deferToThread(self.process, fitsimg) 
+#             threads.deferToThread(self.process, fitsimg)
+#             threads.deferToThread(reactor.spawnProcess, self.process, fitsimg)
+            reactor.spawnProcess(PassAll, self.process(fitsimg))
             # swap buffers
             self.bb1, self.bb2 = self.bb2, self.bb1
             # copy remaining data in current buffer
