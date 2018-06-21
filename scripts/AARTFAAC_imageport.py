@@ -24,8 +24,6 @@ from twisted.python import log
 from sourcefinder.accessors import open as open_accessor
 from sourcefinder.accessors import sourcefinder_image_from_accessor
 
-
-
 from astropy.io import fits
 from astropy.io.fits.hdu.hdulist import HDUList
 from astropy.time import Time
@@ -39,8 +37,6 @@ from atv.streamprotocol import StreamProtocol
 
 FILE_SIZE = 4204800
 FPS = 25
-
-# lock = threading.Lock()
 
 
 # In[ ]:
@@ -119,8 +115,8 @@ class Stream(Protocol):
 
     def process(self, fitsimg):
         """
-        Perform an initial quality control filtering step on the incoming image stream. Images
-        which are not rejected are then flux calibrated using a reference catalogue.
+        Takes incoming fits image from the stream and writes to tmp, if it passes initial quality control 
+        based on total image standard deviation. Then writes filename and image info to queue. 
         """
         
         if self.num_processing >= self.nproc:
@@ -145,12 +141,11 @@ class Stream(Protocol):
 
     def encode(self):
         """
-        Save fits file
+        Get fitsfile information from the queue and spawns an external process which runs the flux 
+        calibraiton script.
         """
         
-        if self.pqueue.qsize() < 3:
-        # why queue more than 3? 
-#             log.msg("Queue size %i" % self.pqueue.qsize())
+        if self.pqueue.qsize() == 0:
             return
 
         t, FRQ, BW, tmpfilename = self.pqueue.get(block=False)
@@ -166,7 +161,7 @@ class Stream(Protocol):
                 log.msg("Processed %s [%i], not saved, exists." % (filename, self.num_processing))
                 return 
             
-            Popen(['python','/afhome/kuiack/scratchpad/scripts/sub_QC-flux.py',
+            process = Popen(['python','/afhome/kuiack/scratchpad/scripts/sub_QC-flux.py',
                              '--indir','/tmp/','--fitsfile',tmpfilename,
                              '--threshold',str(self.threshold),
                              '--detection',str(self.detection),

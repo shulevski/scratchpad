@@ -60,7 +60,9 @@ def get_configuration():
 
 
 def distSquared(p0, p1):
-
+    '''
+    Calculate the distance between point p0, [x,y], and a list of points p1, [[x0..xn],[y0..yn]]. 
+    '''
     distance  = np.sqrt((p0[0] - p1[0,:])**2 + (p0[1] - p1[1,:])**2)
     if np.min(distance) < 1.0:
         return np.where(distance == np.min(distance))[0]
@@ -80,7 +82,9 @@ def pol2cart(rho, phi):
 
 
 def compare_flux(sr, catalog_ras, catalog_decs, catalog_fluxs, catalog_flux_errs):
-
+    '''
+    Compares the two catalogues, matching sources, and outputs the results of linear fit to the fluxes. 
+    '''
     x = []
     y = []
 
@@ -125,10 +129,11 @@ def compare_flux(sr, catalog_ras, catalog_decs, catalog_fluxs, catalog_flux_errs
 
 
 def process(cfg):
-    """
+    '''
     Perform an initial quality control filtering step on the incoming image stream. Images
     which are not rejected are then flux calibrated using a reference catalogue.
-    """
+    '''
+    
     print "running process"
 
     lofarfrequencyOffset = 0.0
